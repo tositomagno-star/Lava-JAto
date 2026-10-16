@@ -14,6 +14,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -67,7 +76,10 @@ type Booking = {
     items: { name: string; quantity: number }[];
   } | null;
 };
-type Slot = { slot_time: string; state: "free" | "booked" | "blocked" | "past" };
+type Slot = {
+  slot_time: string;
+  state: "free" | "booked" | "blocked" | "past" | "unavailable";
+};
 type AdminOrder = {
   id: string;
   code: string;
@@ -134,6 +146,8 @@ function AdminPage() {
   const [section, setSection] = useState<PanelSection>("inicio");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [bookingDate, setBookingDate] = useState(todaySP());
   const [slotDate, setSlotDate] = useState(addDays(todaySP(), 1));
@@ -311,15 +325,25 @@ function AdminPage() {
     }
   }
 
-  async function cancelBooking(booking: Booking) {
-    if (
-      !window.confirm(`Desmarcar o horário de ${booking.orders?.customer_name || "este cliente"}?`)
-    )
-      return;
+  async function confirmBookingCancellation() {
+    if (!bookingToCancel || isCancellingBooking) return;
+    const booking = bookingToCancel;
+    setIsCancellingBooking(true);
     setPageError("");
     setNotice("");
     try {
       const result = await cancelAdminBooking({ data: { bookingId: booking.id } });
+      setBookingToCancel(null);
+      setBookings((current) =>
+        current.map((item) => (item.id === booking.id ? { ...item, status: "cancelled" } : item)),
+      );
+      if (booking.booking_date === slotDate) {
+        setSlots((current) =>
+          current.map((slot) =>
+            slot.slot_time === booking.slot_time ? { ...slot, state: result.slotState } : slot,
+          ),
+        );
+      }
       const statusMessage =
         result.slotState === "free"
           ? "Agendamento desmarcado. O banco confirmou que o horário está livre."
@@ -327,14 +351,22 @@ function AdminPage() {
             ? "Agendamento desmarcado, mas o horário continua bloqueado."
             : "Agendamento desmarcado; a disponibilidade atual não permite oferecer o horário.";
       setNotice(statusMessage);
-      const refreshed = await getAdminBookings({
-        data: { date: bookingDate, availabilityDate: slotDate },
-      });
-      setBookings(refreshed.bookings as Booking[]);
-      setSlots(refreshed.slots as Slot[]);
-      setDashboard((await getAdminDashboard()) as Dashboard);
+      try {
+        const refreshed = await getAdminBookings({
+          data: { date: bookingDate, availabilityDate: slotDate },
+        });
+        setBookings(refreshed.bookings as Booking[]);
+        setSlots(refreshed.slots as Slot[]);
+        setDashboard((await getAdminDashboard()) as Dashboard);
+      } catch (error) {
+        setPageError(
+          `Agendamento cancelado, mas não foi possível atualizar todos os dados do painel: ${errorMessage(error, "erro desconhecido")}`,
+        );
+      }
     } catch (error) {
       setPageError(errorMessage(error, "Não foi possível desmarcar o agendamento."));
+    } finally {
+      setIsCancellingBooking(false);
     }
   }
 
@@ -575,7 +607,7 @@ function AdminPage() {
           slots={slots}
           professionals={validProfessionals}
           loading={isLoading}
-          onCancel={(booking) => void cancelBooking(booking)}
+          onCancel={setBookingToCancel}
           onToggleBlock={(slot) => void toggleBlock(slot)}
           onPrepareWhatsApp={prepareAgendaWhatsApp}
         />
@@ -601,6 +633,50 @@ function AdminPage() {
           onSaveProfessionals={() => void saveProfessionals()}
         />
       )}
+      <AlertDialog
+        open={bookingToCancel !== null}
+        onOpenChange={(open) => {
+          if (!open && !isCancellingBooking) setBookingToCancel(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar cancelamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente cancelar este agendamento?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {bookingToCancel && (
+            <div className="space-y-1 rounded-md border bg-muted/40 p-4 text-sm">
+              <p>
+                <span className="font-semibold">Cliente:</span>{" "}
+                {bookingToCancel.orders?.customer_name || "Não informado"}
+              </p>
+              <p>
+                <span className="font-semibold">Data:</span> {fmtDate(bookingToCancel.booking_date)}{" "}
+                às {bookingToCancel.slot_time}
+              </p>
+              <p>
+                <span className="font-semibold">Serviço:</span>{" "}
+                {bookingToCancel.orders?.items
+                  .map((item) => `${item.quantity}x ${item.name}`)
+                  .join(", ") || "Não informado"}
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancellingBooking}>Voltar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmBookingCancellation()}
+              disabled={isCancellingBooking}
+            >
+              {isCancellingBooking && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar cancelamento
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
@@ -795,7 +871,7 @@ function BookingsView({
                         </a>
                       )}
                       <Button variant="destructive" size="sm" onClick={() => onCancel(booking)}>
-                        Desmarcar
+                        Cancelar agendamento
                       </Button>
                     </div>
                   )}
