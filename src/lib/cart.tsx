@@ -1,6 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { mergeCartItem, type ArrivalMethod, type CartItem, type ReturnMethod } from "./cart-utils";
+import {
+  mergeCartItem,
+  syncCartPrices,
+  type ArrivalMethod,
+  type CartItem,
+  type CatalogItem,
+  type ReturnMethod,
+} from "./cart-utils";
 export type { CartItem } from "./cart-utils";
 
 export function cartTotal(items: CartItem[]) {
@@ -13,6 +20,7 @@ type Ctx = {
   returnMethod: ReturnMethod | null;
   setArrivalMethod: (method: ArrivalMethod) => void;
   setReturnMethod: (method: ReturnMethod) => void;
+  syncPrices: (catalog: CatalogItem[]) => void;
   add: (i: Omit<CartItem, "quantity">) => void;
   setQty: (id: string, q: number) => void;
   remove: (id: string) => void;
@@ -69,6 +77,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [arrivalMethod, setArrivalMethod] = useState<ArrivalMethod | null>(null);
   const [returnMethod, setReturnMethod] = useState<ReturnMethod | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const syncPrices = useCallback((catalog: CatalogItem[]) => {
+    setItems((current) => syncCartPrices(current, catalog));
+  }, []);
 
   useEffect(() => {
     try {
@@ -127,6 +138,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     returnMethod,
     setArrivalMethod,
     setReturnMethod,
+    syncPrices,
     add: (i) => setItems((prev) => mergeCartItem(prev, i)),
     setQty: (id, q) => {
       if (q < 1 && items.length === 1 && items[0]?.service_id === id) {

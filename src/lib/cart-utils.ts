@@ -5,8 +5,22 @@ export type CartItem = {
   quantity: number;
 };
 
+export type CatalogItem = Pick<CartItem, "service_id" | "name" | "price">;
+
 export type ArrivalMethod = "dropoff" | "pickup";
 export type ReturnMethod = "customer_pickup" | "delivery";
+
+export function syncCartPrices(items: CartItem[], catalog: CatalogItem[]) {
+  const catalogById = new Map(catalog.map((item) => [item.service_id, item]));
+  let changed = false;
+  const syncedItems = items.map((item) => {
+    const current = catalogById.get(item.service_id);
+    if (!current || (current.name === item.name && current.price === item.price)) return item;
+    changed = true;
+    return { ...item, name: current.name, price: current.price };
+  });
+  return changed ? syncedItems : items;
+}
 
 export function hasRequiredDeliveryChoices(
   arrivalMethod: ArrivalMethod | null,

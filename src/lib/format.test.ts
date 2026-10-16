@@ -54,6 +54,9 @@ describe("Brazil regional formatting", () => {
       "6": weekendHours,
       "0": [],
     });
+    expect(DEFAULT_SCHEDULE["5"]).toContain("17:00");
+    expect(DEFAULT_SCHEDULE["6"]).toContain("17:00");
+    expect(DEFAULT_SCHEDULE["0"]).toEqual([]);
     expect(
       Object.values(DEFAULT_SCHEDULE)
         .flat()

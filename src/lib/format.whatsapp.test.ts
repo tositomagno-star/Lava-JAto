@@ -2,6 +2,29 @@ import { describe, expect, it } from "vitest";
 import { brl, buildWhatsAppMessage, type OrderSummary } from "./format";
 
 describe("WhatsApp order summary", () => {
+  it("uses the current motorcycle catalog price in the message and subtotal", () => {
+    const order: OrderSummary = {
+      customer_name: "Cliente",
+      phone: "31999999999",
+      vehicle_model: "Motocicleta",
+      plate: null,
+      booking_date: "2026-10-17",
+      slot_time: "17:00",
+      delivery_method: "dropoff",
+      notes: null,
+      pickup_fee: 0,
+      total: 50,
+      items: [{ name: "Motocicleta", quantity: 1, unit_price: 50, subtotal: 50 }],
+    };
+
+    const message = buildWhatsAppMessage(order).replace(/\u00a0/g, " ");
+    const motorcyclePrice = brl(50).replace(/\u00a0/g, " ");
+
+    expect(message).toContain("- 1x Motocicleta — R$ 50,00");
+    expect(message).toContain(`Subtotal: ${motorcyclePrice}`);
+    expect(message).toContain(`TOTAL DO PEDIDO: ${motorcyclePrice}`);
+  });
+
   it("shows the pickup fee separately from the service subtotal", () => {
     const order: OrderSummary = {
       customer_name: "Cliente",

@@ -8,17 +8,18 @@ import {
   MessageCircle,
   Truck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useCart } from "@/lib/cart";
+import { cartTotal, useCart } from "@/lib/cart";
 import { hasRequiredDeliveryChoices } from "@/lib/cart-utils";
 import { noAvailabilityMessage } from "@/lib/availability";
 import { clearCheckoutConfirmationToken, getCheckoutConfirmationToken } from "@/lib/checkout-token";
-import { useAvailability, useProfessionals, useSettings } from "@/lib/data";
+import { useAvailability, useProfessionals, useServices, useSettings } from "@/lib/data";
+import { syncCartPrices } from "@/lib/cart-utils";
 import { bookingWindow } from "@/lib/agenda";
 import {
   buildWhatsAppMessage,
@@ -67,8 +68,9 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function CheckoutPage() {
-  const { items, total, clear, arrivalMethod, returnMethod, setArrivalMethod } = useCart();
+  const { items, clear, arrivalMethod, returnMethod, setArrivalMethod, syncPrices } = useCart();
   const { data: settings } = useSettings();
+  const { data: services, isFetching: servicesFetching, error: servicesError } = useServices();
   const [form, setForm] = useState(emptyForm);
   const [validDates, setValidDates] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -82,6 +84,22 @@ function CheckoutPage() {
     isLoading: availabilityLoading,
     error: availabilityError,
   } = useAvailability(form.booking_date);
+  const catalogItems = useMemo(
+    () =>
+      services?.map((service) => ({
+        service_id: service.id,
+        name: service.name,
+        price: Number(service.price),
+      })) || [],
+    [services],
+  );
+  const catalogReady = !!services && !servicesFetching && !servicesError;
+  const currentItems = services ? syncCartPrices(items, catalogItems) : items;
+  const total = cartTotal(currentItems);
+  const hasUnavailableService =
+    catalogReady &&
+    items.some((item) => !catalogItems.some((service) => service.service_id === item.service_id));
+  const canProceedWithCatalog = catalogReady && !hasUnavailableService;
 
   useEffect(() => {
     const refreshToday = () => {
@@ -99,6 +117,10 @@ function CheckoutPage() {
     const interval = window.setInterval(refreshToday, 60_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (catalogReady) syncPrices(catalogItems);
+  }, [catalogReady, catalogItems, syncPrices]);
 
   useEffect(() => {
     if (arrivalMethod) {
@@ -144,7 +166,7 @@ function CheckoutPage() {
     );
   }
 
-  const cartRows = items.map((item) => ({
+  const cartRows = currentItems.map((item) => ({
     ...item,
     subtotal: item.price * item.quantity,
   }));
@@ -166,6 +188,17 @@ function CheckoutPage() {
   function validate() {
     const nextErrors: string[] = [];
 
+    if (!catalogReady) {
+      nextErrors.push(
+        servicesError
+          ? "Não foi possível verificar os preços atuais dos serviços. Tente novamente."
+          : "Aguarde a verificação dos preços atuais dos serviços.",
+      );
+    } else if (hasUnavailableService) {
+      nextErrors.push(
+        "Um serviço do carrinho não está mais disponível. Remova-o antes de continuar.",
+      );
+    }
     if (!hasRequiredDeliveryChoices(arrivalMethod, returnMethod))
       nextErrors.push("Selecione uma opção de envio e uma de entrega no carrinho.");
     if (!form.customer_name.trim()) nextErrors.push("Informe o nome do cliente.");
@@ -345,6 +378,21 @@ function CheckoutPage() {
             ))}
           </ul>
         </div>
+      )}
+      {servicesFetching && (
+        <p role="status" className="mb-6 text-sm text-muted-foreground">
+          Verificando os preços atuais dos serviços...
+        </p>
+      )}
+      {servicesError && (
+        <p role="alert" className="mb-6 text-sm text-destructive">
+          Não foi possível verificar os preços atuais. Atualize a página antes de continuar.
+        </p>
+      )}
+      {hasUnavailableService && (
+        <p role="alert" className="mb-6 text-sm text-destructive">
+          Um serviço do carrinho não está mais disponível. Volte ao carrinho e remova-o.
+        </p>
       )}
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
@@ -774,12 +822,16 @@ function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {step === "details" ? (
-                <Button onClick={handleReview} className="w-full">
+                <Button onClick={handleReview} className="w-full" disabled={!canProceedWithCatalog}>
                   Continuar para revisão
                 </Button>
               ) : (
                 <>
-                  <Button onClick={handleConfirm} className="w-full" disabled={isSubmitting}>
+                  <Button
+                    onClick={handleConfirm}
+                    className="w-full"
+                    disabled={isSubmitting || !canProceedWithCatalog}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" /> Confirmando...

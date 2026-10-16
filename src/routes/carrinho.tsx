@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo } from "react";
 import { MapPinned, Minus, Plus, ShoppingCart, Trash2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { hasRequiredDeliveryChoices } from "@/lib/cart-utils";
+import { hasRequiredDeliveryChoices, syncCartPrices } from "@/lib/cart-utils";
 import { brl } from "@/lib/format";
+import { useServices } from "@/lib/data";
 
 export const Route = createFileRoute("/carrinho")({
   head: () => ({
@@ -23,13 +25,34 @@ function CartPage() {
     items,
     setQty,
     remove,
-    total,
     arrivalMethod,
     returnMethod,
     setArrivalMethod,
     setReturnMethod,
+    syncPrices,
   } = useCart();
+  const { data: services, isFetching: servicesFetching, error: servicesError } = useServices();
+  const catalogReady = !!services && !servicesFetching && !servicesError;
+  const catalogItems = useMemo(
+    () =>
+      services?.map((service) => ({
+        service_id: service.id,
+        name: service.name,
+        price: Number(service.price),
+      })) || [],
+    [services],
+  );
+  const currentItems = services ? syncCartPrices(items, catalogItems) : items;
+  const total = currentItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const hasUnavailableService =
+    catalogReady &&
+    items.some((item) => !catalogItems.some((service) => service.service_id === item.service_id));
   const hasDeliveryChoices = hasRequiredDeliveryChoices(arrivalMethod, returnMethod);
+
+  useEffect(() => {
+    if (catalogReady) syncPrices(catalogItems);
+  }, [catalogReady, catalogItems, syncPrices]);
+
   if (items.length === 0)
     return (
       <div className="mx-auto max-w-xl px-4 py-24 text-center">
@@ -48,7 +71,7 @@ function CartPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-4xl">Carrinho</h1>
       <ul className="mt-6 divide-y rounded-lg border bg-card">
-        {items.map((i) => (
+        {currentItems.map((i) => (
           <li key={i.service_id} className="flex flex-wrap items-center gap-4 p-4">
             <div className="min-w-0 flex-1">
               <p className="font-bold">{i.name}</p>
@@ -156,15 +179,31 @@ function CartPage() {
         </Link>
         <Link
           to="/checkout"
-          aria-disabled={!hasDeliveryChoices}
+          aria-disabled={!hasDeliveryChoices || !catalogReady || hasUnavailableService}
           onClick={(event) => {
-            if (!hasDeliveryChoices) event.preventDefault();
+            if (!hasDeliveryChoices || !catalogReady || hasUnavailableService)
+              event.preventDefault();
           }}
-          className={`rounded-md px-8 py-3 text-center font-bold uppercase shadow-glow ${hasDeliveryChoices ? "bg-primary text-primary-foreground" : "cursor-not-allowed bg-muted text-muted-foreground"}`}
+          className={`rounded-md px-8 py-3 text-center font-bold uppercase shadow-glow ${hasDeliveryChoices && catalogReady && !hasUnavailableService ? "bg-primary text-primary-foreground" : "cursor-not-allowed bg-muted text-muted-foreground"}`}
         >
           Finalizar pedido
         </Link>
       </div>
+      {servicesFetching && (
+        <p role="status" className="mt-3 text-right text-sm text-muted-foreground">
+          Verificando os preços atuais dos serviços...
+        </p>
+      )}
+      {servicesError && (
+        <p role="alert" className="mt-3 text-right text-sm text-destructive">
+          Não foi possível verificar os preços atuais. Atualize a página antes de finalizar.
+        </p>
+      )}
+      {hasUnavailableService && (
+        <p role="alert" className="mt-3 text-right text-sm text-destructive">
+          Um serviço do carrinho não está mais disponível. Remova-o antes de finalizar.
+        </p>
+      )}
       {!hasDeliveryChoices && (
         <p role="status" className="mt-3 text-right text-sm text-muted-foreground">
           Selecione uma opção de envio e uma de entrega para continuar.

@@ -27,6 +27,7 @@ select
     when 1792114447216 then '0003_booking_window_and_professionals'
     when 1792151123401 then '0004_checkout_confirmation_token'
     when 1792166085760 then '0005_atomic_admin_slot_blocks'
+    when 1792187240025 then '0006_schedule_and_motorcycle_price'
     else 'unknown journal timestamp'
   end as journal_entry
 from drizzle.__drizzle_migrations

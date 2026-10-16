@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Instagram, MessageCircle, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useSettings } from "@/lib/data";
-import { onlyDigits, REGION } from "@/lib/format";
+import { DEFAULT_SCHEDULE, onlyDigits, parseSchedule, REGION } from "@/lib/format";
 
 export function Logo() {
   return (
@@ -52,6 +52,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const { data: s } = useSettings();
+  const schedule = parseSchedule(s?.schedule) ?? DEFAULT_SCHEDULE;
   return (
     <footer className="mt-20 border-t">
       <div className="stripe h-1.5" />
@@ -66,10 +67,13 @@ export function SiteFooter() {
           {s?.contact_info && <p className="text-sm text-muted-foreground">{s.contact_info}</p>}
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-semibold uppercase">Horários</p>
-          <p className="text-muted-foreground">Seg a Qui: 08:00 às 16:30</p>
-          <p className="text-muted-foreground">Sex e Sáb: 08:00 às 17:00</p>
-          <p className="text-muted-foreground">Domingo: fechado</p>
+          <p className="mb-2 font-semibold uppercase">Horários de agendamento</p>
+          <p className="text-muted-foreground">Seg a Qui: {schedule["1"]?.join(" · ")}</p>
+          <p className="text-muted-foreground">Sex: {schedule["5"]?.join(" · ")}</p>
+          <p className="text-muted-foreground">Sáb: {schedule["6"]?.join(" · ")}</p>
+          <p className="text-muted-foreground">
+            Dom: {schedule["0"]?.length ? schedule["0"].join(" · ") : "Fechado"}
+          </p>
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <p className="font-semibold uppercase">Contato</p>

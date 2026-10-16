@@ -43,6 +43,13 @@
       "when": 1792166085760,
       "tag": "0005_atomic_admin_slot_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792187240025,
+      "tag": "0006_schedule_and_motorcycle_price",
+      "breakpoints": true
     }
   ]
 }
