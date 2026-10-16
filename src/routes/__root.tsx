@@ -70,6 +70,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "Lava-jato Moto Car: agende a lavagem do seu carro ou moto online.",
       },
+      { property: "og:image", content: "https://lava-j-ato.vercel.app/motocar-social.png" },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:width", content: "768" },
+      { property: "og:image:height", content: "768" },
+      {
+        property: "og:image:alt",
+        content: "Logo Moto Car com motocicleta sendo lavada",
+      },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://lava-j-ato.vercel.app/motocar-social.png" },
+      {
+        name: "twitter:image:alt",
+        content: "Logo Moto Car com motocicleta sendo lavada",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
