@@ -84,6 +84,8 @@ export type OrderSummary = {
   booking_date: string;
   slot_time: string;
   delivery_method: "dropoff" | "pickup";
+  arrival_method?: "dropoff" | "pickup";
+  return_method?: "customer_pickup" | "delivery";
   cep?: string | null;
   street?: string | null;
   district?: string | null;
@@ -108,7 +110,7 @@ export function buildWhatsAppMessage(o: OrderSummary) {
   lines.push("", "CLIENTE", `Nome: ${o.customer_name}`, `Telefone: ${o.phone}`);
   lines.push("", "VEÍCULO", `Modelo: ${o.vehicle_model}`, `Placa: ${o.plate || "Não informada"}`);
   lines.push("", "AGENDAMENTO", `Data: ${fmtDate(o.booking_date)}`, `Horário: ${o.slot_time}`);
-  lines.push("", "ENTREGA DO VEÍCULO");
+  lines.push("", "CHEGADA À MOTO CAR");
 
   if (o.delivery_method === "dropoff") {
     lines.push("Vou levar o veículo até a Moto Car.");
@@ -122,6 +124,20 @@ export function buildWhatsAppMessage(o: OrderSummary) {
   }
 
   lines.push("", "PROFISSIONAL ESCOLHIDO", o.professional_name || "Não informado");
+  if (o.arrival_method) {
+    lines.push(
+      "",
+      "ENVIO",
+      o.arrival_method === "dropoff" ? "Leve até Moto Car" : "Busque até mim",
+    );
+  }
+  if (o.return_method) {
+    lines.push(
+      "",
+      "ENTREGA",
+      o.return_method === "customer_pickup" ? "Buscar em Moto Car" : "Leve até mim",
+    );
+  }
   lines.push("", "SERVIÇOS SOLICITADOS");
 
   for (const i of o.items) {

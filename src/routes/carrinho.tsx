@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { MapPinned, Minus, Plus, ShoppingCart, Trash2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { hasRequiredDeliveryChoices } from "@/lib/cart-utils";
 import { brl } from "@/lib/format";
 
 export const Route = createFileRoute("/carrinho")({
@@ -18,7 +19,17 @@ export const Route = createFileRoute("/carrinho")({
 });
 
 function CartPage() {
-  const { items, setQty, remove, total } = useCart();
+  const {
+    items,
+    setQty,
+    remove,
+    total,
+    arrivalMethod,
+    returnMethod,
+    setArrivalMethod,
+    setReturnMethod,
+  } = useCart();
+  const hasDeliveryChoices = hasRequiredDeliveryChoices(arrivalMethod, returnMethod);
   if (items.length === 0)
     return (
       <div className="mx-auto max-w-xl px-4 py-24 text-center">
@@ -71,6 +82,67 @@ function CartPage() {
           </li>
         ))}
       </ul>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <section className="space-y-3" aria-labelledby="arrival-heading">
+          <div>
+            <h2 id="arrival-heading" className="text-lg font-bold uppercase">
+              Envio <span className="text-destructive">*</span>
+            </h2>
+            <p className="text-sm text-muted-foreground">Como o veículo chegará até a Moto Car?</p>
+          </div>
+          <div className="grid gap-3">
+            <button
+              type="button"
+              aria-pressed={arrivalMethod === "dropoff"}
+              onClick={() => setArrivalMethod("dropoff")}
+              className={`flex min-h-14 items-center gap-3 rounded-lg border p-4 text-left font-semibold transition ${arrivalMethod === "dropoff" ? "border-primary bg-primary/5 text-primary" : "border-input bg-card hover:border-primary/50"}`}
+            >
+              <Truck className="h-5 w-5 shrink-0" />
+              Leve até Moto Car
+            </button>
+            <button
+              type="button"
+              aria-pressed={arrivalMethod === "pickup"}
+              onClick={() => setArrivalMethod("pickup")}
+              className={`flex min-h-14 items-center gap-3 rounded-lg border p-4 text-left font-semibold transition ${arrivalMethod === "pickup" ? "border-primary bg-primary/5 text-primary" : "border-input bg-card hover:border-primary/50"}`}
+            >
+              <MapPinned className="h-5 w-5 shrink-0" />
+              Busque até mim
+            </button>
+          </div>
+        </section>
+
+        <section className="space-y-3" aria-labelledby="return-heading">
+          <div>
+            <h2 id="return-heading" className="text-lg font-bold uppercase">
+              Entrega <span className="text-destructive">*</span>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Como prefere receber o veículo após o serviço?
+            </p>
+          </div>
+          <div className="grid gap-3">
+            <button
+              type="button"
+              aria-pressed={returnMethod === "customer_pickup"}
+              onClick={() => setReturnMethod("customer_pickup")}
+              className={`flex min-h-14 items-center gap-3 rounded-lg border p-4 text-left font-semibold transition ${returnMethod === "customer_pickup" ? "border-primary bg-primary/5 text-primary" : "border-input bg-card hover:border-primary/50"}`}
+            >
+              <MapPinned className="h-5 w-5 shrink-0" />
+              Buscar em Moto Car
+            </button>
+            <button
+              type="button"
+              aria-pressed={returnMethod === "delivery"}
+              onClick={() => setReturnMethod("delivery")}
+              className={`flex min-h-14 items-center gap-3 rounded-lg border p-4 text-left font-semibold transition ${returnMethod === "delivery" ? "border-primary bg-primary/5 text-primary" : "border-input bg-card hover:border-primary/50"}`}
+            >
+              <Truck className="h-5 w-5 shrink-0" />
+              Leve até mim
+            </button>
+          </div>
+        </section>
+      </div>
       <div className="mt-6 flex items-center justify-between rounded-lg border bg-card p-5">
         <span className="text-lg uppercase">Total</span>
         <span className="font-display text-3xl text-primary">{brl(total)}</span>
@@ -84,11 +156,20 @@ function CartPage() {
         </Link>
         <Link
           to="/checkout"
-          className="rounded-md bg-primary px-8 py-3 text-center font-bold uppercase text-primary-foreground shadow-glow"
+          aria-disabled={!hasDeliveryChoices}
+          onClick={(event) => {
+            if (!hasDeliveryChoices) event.preventDefault();
+          }}
+          className={`rounded-md px-8 py-3 text-center font-bold uppercase shadow-glow ${hasDeliveryChoices ? "bg-primary text-primary-foreground" : "cursor-not-allowed bg-muted text-muted-foreground"}`}
         >
           Finalizar pedido
         </Link>
       </div>
+      {!hasDeliveryChoices && (
+        <p role="status" className="mt-3 text-right text-sm text-muted-foreground">
+          Selecione uma opção de envio e uma de entrega para continuar.
+        </p>
+      )}
     </div>
   );
 }

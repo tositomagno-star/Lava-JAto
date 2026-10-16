@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/lib/cart";
+import { hasRequiredDeliveryChoices } from "@/lib/cart-utils";
 import { noAvailabilityMessage } from "@/lib/availability";
 import { clearCheckoutConfirmationToken, getCheckoutConfirmationToken } from "@/lib/checkout-token";
 import { useAvailability, useProfessionals, useSettings } from "@/lib/data";
@@ -66,7 +67,7 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function CheckoutPage() {
-  const { items, total, clear } = useCart();
+  const { items, total, clear, arrivalMethod, returnMethod, setArrivalMethod } = useCart();
   const { data: settings } = useSettings();
   const [form, setForm] = useState(emptyForm);
   const [validDates, setValidDates] = useState<string[]>([]);
@@ -98,6 +99,16 @@ function CheckoutPage() {
     const interval = window.setInterval(refreshToday, 60_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (arrivalMethod) {
+      setForm((current) =>
+        current.delivery_method === arrivalMethod
+          ? current
+          : { ...current, delivery_method: arrivalMethod },
+      );
+    }
+  }, [arrivalMethod]);
 
   useEffect(() => {
     if (
@@ -147,9 +158,16 @@ function CheckoutPage() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function updateArrivalMethod(method: "dropoff" | "pickup") {
+    setArrivalMethod(method);
+    updateField("delivery_method", method);
+  }
+
   function validate() {
     const nextErrors: string[] = [];
 
+    if (!hasRequiredDeliveryChoices(arrivalMethod, returnMethod))
+      nextErrors.push("Selecione uma opção de envio e uma de entrega no carrinho.");
     if (!form.customer_name.trim()) nextErrors.push("Informe o nome do cliente.");
     if (!isValidWhatsAppNumber(form.phone)) nextErrors.push("Informe um telefone válido com DDD.");
     if (!form.vehicle_model.trim()) nextErrors.push("Informe o modelo do veículo.");
@@ -183,6 +201,7 @@ function CheckoutPage() {
     const nextErrors = validate();
     setErrors(nextErrors);
     if (nextErrors.length > 0) return;
+    if (!arrivalMethod || !returnMethod) return;
 
     if (
       !selectedProfessional ||
@@ -271,7 +290,11 @@ function CheckoutPage() {
         );
       }
 
-      const message = buildWhatsAppMessage(summary);
+      const message = buildWhatsAppMessage({
+        ...summary,
+        arrival_method: arrivalMethod,
+        return_method: returnMethod,
+      });
       const link = professionalWhatsAppUrl(
         {
           ...selectedProfessional,
@@ -435,19 +458,32 @@ function CheckoutPage() {
                   )}
                 </div>
 
+                <div className="rounded-md border bg-muted/40 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Entrega
+                  </p>
+                  <p className="mt-2 font-semibold">
+                    {returnMethod === "customer_pickup"
+                      ? "Buscar em Moto Car"
+                      : returnMethod === "delivery"
+                        ? "Leve até mim"
+                        : "Não selecionada"}
+                  </p>
+                </div>
+
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Como você vai entregar o veículo?</Label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
-                      onClick={() => updateField("delivery_method", "dropoff")}
+                      onClick={() => updateArrivalMethod("dropoff")}
                       className={`flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-semibold ${form.delivery_method === "dropoff" ? "border-primary bg-primary/5 text-primary" : "border-input bg-background"}`}
                     >
                       <Truck className="h-4 w-4" /> Vou levar até a Moto Car
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateField("delivery_method", "pickup")}
+                      onClick={() => updateArrivalMethod("pickup")}
                       className={`flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-semibold ${form.delivery_method === "pickup" ? "border-primary bg-primary/5 text-primary" : "border-input bg-background"}`}
                     >
                       <MapPinned className="h-4 w-4" /> Quero solicitar a retirada
@@ -555,7 +591,7 @@ function CheckoutPage() {
 
                 <div className="rounded-md border bg-muted/40 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Entrega
+                    Envio
                   </p>
                   <p className="mt-2 font-semibold">
                     {form.delivery_method === "dropoff"
