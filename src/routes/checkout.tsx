@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/lib/cart";
+import { noAvailabilityMessage } from "@/lib/availability";
+import { clearCheckoutConfirmationToken, getCheckoutConfirmationToken } from "@/lib/checkout-token";
 import { useAvailability, useProfessionals, useSettings } from "@/lib/data";
 import { bookingWindow } from "@/lib/agenda";
 import {
@@ -139,6 +141,7 @@ function CheckoutPage() {
   const selectedProfessional =
     professionals.find((professional) => professional.id === selectedProfessionalId) || null;
   const activeProfessionals = professionals;
+  const availabilityMessage = noAvailabilityMessage(availability);
 
   function updateField<K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -148,7 +151,7 @@ function CheckoutPage() {
     const nextErrors: string[] = [];
 
     if (!form.customer_name.trim()) nextErrors.push("Informe o nome do cliente.");
-    if (!form.phone.trim()) nextErrors.push("Informe o telefone.");
+    if (!isValidWhatsAppNumber(form.phone)) nextErrors.push("Informe um telefone válido com DDD.");
     if (!form.vehicle_model.trim()) nextErrors.push("Informe o modelo do veículo.");
     if (!form.booking_date) nextErrors.push("Selecione a data do agendamento.");
     else if (!validDates.includes(form.booking_date))
@@ -190,6 +193,13 @@ function CheckoutPage() {
       return;
     }
 
+    const whatsappWindow = window.open("about:blank", "_blank");
+    if (!whatsappWindow) {
+      toast.error("Permita pop-ups para abrir o WhatsApp e enviar seu pedido.");
+      return;
+    }
+    whatsappWindow.opener = null;
+
     setIsSubmitting(true);
 
     try {
@@ -224,20 +234,22 @@ function CheckoutPage() {
       };
 
       const professionalPhone = normalizeWhatsAppNumber(selectedProfessional.phone);
+      const confirmationToken = getCheckoutConfirmationToken(window.sessionStorage);
       const { data, error } = await supabase.rpc("create_order_with_professional", {
         _payload: payload,
         _professional_name: selectedProfessional.name,
         _professional_phone: professionalPhone,
+        _confirmation_token: confirmationToken,
       });
       if (error) throw error;
 
-      const order = data as { code?: string; id?: string } | null;
-      if (!order?.id)
-        throw new Error("O pedido foi criado, mas não foi possível obter o código para confirmar.");
+      const order = data as { code?: string; id?: string; confirmation_token?: string } | null;
+      if (!order?.id || !order.confirmation_token || order.confirmation_token !== confirmationToken)
+        throw new Error("O pedido foi criado, mas não foi possível obter os dados para confirmar.");
 
       const { data: orderSummaryData, error: summaryError } = await supabase.rpc(
         "get_order_summary",
-        { _id: order.id },
+        { _id: order.id, _confirmation_token: order.confirmation_token },
       );
       if (summaryError) throw summaryError;
       if (
@@ -270,10 +282,12 @@ function CheckoutPage() {
       );
       if (!link)
         throw new Error("O WhatsApp do profissional selecionado não está ativo ou configurado.");
-      window.open(link, "_blank", "noopener,noreferrer");
+      whatsappWindow.location.href = link;
+      clearCheckoutConfirmationToken(window.sessionStorage);
       clear();
       toast.success("Pedido criado. Abra o WhatsApp e toque em Enviar para concluir.");
     } catch (error) {
+      if (!whatsappWindow.closed) whatsappWindow.close();
       console.error(error);
       const message =
         error instanceof Error ? error.message : "Não foi possível confirmar o pedido agora.";
@@ -414,6 +428,11 @@ function CheckoutPage() {
                       ))
                     )}
                   </select>
+                  {!availabilityLoading && !availabilityError && availabilityMessage && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {availabilityMessage}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 sm:col-span-2">

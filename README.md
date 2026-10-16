@@ -32,7 +32,11 @@ Comandos disponíveis:
 bun run test
 bun run lint
 bun run build
+bun run preview
 ```
+
+Run `bun run preview` after a production build to preview the generated Nitro
+deployment output locally.
 
 ## Rotas
 
@@ -40,32 +44,55 @@ bun run build
 - `/servicos` — catálogo de serviços e preços
 - `/carrinho` — revisão dos serviços escolhidos
 - `/checkout` — seleção de data/horário e envio do pedido
-- `/admin` — agenda e configurações administrativas; requer usuário autenticado
-  com o papel `admin` no Supabase
+- `/admin` — painel administrativo protegido por senha, com agenda, pedidos e
+  configurações
 
 ## Supabase e variáveis de ambiente
 
-O app usa o projeto Supabase existente configurado para o ambiente Lovable. Para
-desenvolvimento local, obtenha os valores autorizados do projeto existente e
-configure-os no ambiente local, nunca em arquivos versionados:
+O projeto Supabase pretendido é `jbrxnnzkewipjpixcbfa`. O campo
+`project_id` em `supabase/config.toml` identifica o alvo do Supabase CLI; ele
+não configura as URLs usadas pela aplicação. Para desenvolvimento local,
+configure os valores autorizados do mesmo projeto no ambiente local, nunca em
+arquivos versionados:
 
 - `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` para o cliente web.
 - `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` para o runtime do servidor.
 - `SUPABASE_SERVICE_ROLE_KEY`, somente se uma operação estritamente server-side
   que ignore RLS for necessária. Nunca use prefixo `VITE_` nessa chave.
+- `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET`,
+  `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` para habilitar o painel
+  administrativo. São variáveis privadas de runtime; não use prefixo `VITE_`.
 - `LOVABLE_DB_MIGRATION_URL` somente para uma execução de migration previamente
   revisada e autorizada; não é necessária para iniciar o app.
 
-Não substitua URL, identificador, chaves ou banco de produção durante a
-importação para o GitHub. A publicação do código não executa migrations nem
-migra dados. Consulte as instruções de segurança abaixo antes de qualquer
-operação de banco.
+Antes de iniciar ou implantar o app, confirme que as URLs de frontend e SSR,
+as chaves públicas correspondentes e o projeto selecionado no painel Supabase
+pertencem todos ao ID acima. A alteração do `project_id` local não altera nem
+valida as variáveis de runtime. Não troque URLs ou chaves por valores
+presumidos. A publicação do código não executa migrations nem migra dados;
+consulte as instruções de segurança abaixo antes de qualquer operação de
+banco.
+
+Gere `ADMIN_PASSWORD_HASH` sem gravar a senha em arquivo usando
+`node .\scripts\generate-admin-password-hash.mjs` em um terminal privado. A
+senha deve ter pelo menos 12 caracteres. Configure também um
+`ADMIN_SESSION_SECRET` aleatório com pelo menos 32 caracteres e credenciais
+HTTPS do Upstash Redis para limitar tentativas de login. O painel só será
+habilitado quando essas variáveis, `SUPABASE_URL` e
+`SUPABASE_SERVICE_ROLE_KEY` estiverem configuradas no servidor. A chave de
+service role nunca deve ser enviada ao navegador.
+As sessões administrativas têm validade de 8 horas e são revogadas no Redis ao
+sair do painel; se o armazenamento de sessão estiver indisponível, as operações
+administrativas falham de forma fechada.
 
 ## Implantação
 
-O projeto usa o preset TanStack Start do Lovable para Vite/Nitro; mantenha a
-configuração de hospedagem existente ao escolher o destino de implantação.
-Este README não configura domínio, secrets de produção ou serviços externos.
+O projeto usa TanStack Start com Nitro e fixa o preset `vercel` para builds
+fora do ambiente de build do Lovable. Na Vercel, configure as variáveis de
+runtime adequadas para Production, Preview e Development sem expor
+`SUPABASE_SERVICE_ROLE_KEY` ao cliente. O build local não valida secrets,
+domínios, autenticação, banco ou comportamento na infraestrutura da Vercel;
+valide primeiro em Preview/Staging.
 
 ## Regional settings
 
@@ -74,30 +101,50 @@ BRL, 24-hour appointment times, and the `America/Sao_Paulo` timezone. Calendar
 dates are handled as date-only values so the selected day and weekday do not
 shift when the browser or database host uses UTC or another timezone.
 
-Apply pending SQL files in `drizzle/migrations` when deploying database
-changes. The booking-window/professional migrations create shared Supabase
-professional records, enforce the tomorrow-through-seven-days booking window,
-and save the selected professional snapshot on new orders. They do not modify
-opening hours or delete or rewrite existing orders and bookings. Apply the
-migrations in order before deploying the corresponding checkout and admin
-changes.
+Apply only migrations confirmed pending after reconciling the database ledger
+and schema with `drizzle/migrations`. The booking-window/professional
+migrations create shared Supabase professional records, enforce the
+tomorrow-through-seven-days booking window, and save the selected professional
+snapshot on new orders. They do not modify opening hours or delete or rewrite
+existing orders and bookings. Follow the operator procedure below before
+coordinating database and application releases.
 
 Professional names, active flags, and WhatsApp numbers are stored in Supabase
 and shared across devices. Existing orders preserve their saved professional
 name and destination number; older orders remain unchanged and may not have
 either value recorded.
 
+Migration `0004_checkout_confirmation_token.sql` adds an opaque confirmation
+token to new orders, makes checkout summary requests prove possession of that
+token, and removes anonymous execution of the UUID-only summary RPC. It must be
+reviewed and applied only after the database owner verifies the migration
+ledger/schema and approves the coordinated checkout deployment. This project
+does not apply migrations automatically.
+
+Migration `0005_atomic_admin_slot_blocks.sql` serializes new reservations and
+administrative slot-block changes with the same transaction-level lock, and
+adds an RPC executable only by `service_role`. It does not create tables,
+relax RLS, or modify existing rows. Reconcile the migration ledger and schema
+and obtain explicit approval before applying it; the local code cannot use the
+RPC until the migration is present remotely.
+
 ## Production migration safety (2026-10-16)
 
-The read-only production API check confirmed the expected
+The production observations below are a dated record from an earlier check and
+were not independently re-verified during the local code review. They are not
+evidence of the current state of project `jbrxnnzkewipjpixcbfa`; verify the
+dashboard project and rerun the read-only diagnostics before relying on them.
+
+The earlier read-only API check reported the expected
 `America/Sao_Paulo` timezone and weekly schedule. It also confirmed that the
-current availability RPC still returns slots outside tomorrow through seven
-days ahead. The RPC's date-window fix is in
+availability RPC at that time still returned slots outside tomorrow through
+seven days ahead. The RPC's date-window fix is in
 `drizzle/migrations/0003_booking_window_and_professionals.sql`; the deployed
-RPC behaves like the no-window implementations in the baseline/`0001` and
-returned availability for dates beyond the allowed range. Production also lacks
-`orders.professional_name` and the `professionals` table, so `0002` and `0003`
-are not fully present.
+RPC reported then behaved like the no-window implementations in the
+baseline/`0001`. The earlier check also reported missing
+`orders.professional_name` and `professionals`, suggesting `0002` and `0003`
+were not fully present at that time. None of these observations should be
+treated as a current production finding.
 
 The public Supabase API cannot read Drizzle's internal migration ledger. An
 authorized database operator must inspect it in the Supabase SQL Editor using
@@ -112,11 +159,12 @@ the initial schema already used that timezone.
 
 ### Authorized operator procedure
 
-1. Run the read-only statements in
+1. Confirm that the Supabase dashboard is connected to project
+   `jbrxnnzkewipjpixcbfa`, then run sections 1-3 of
    [`production_read_only.sql`](./drizzle/diagnostics/production_read_only.sql)
-   from the Supabase SQL Editor while connected to the intended production
-   project. If the ledger relation is absent, do not query it directly and do
-   not run the migration runner yet.
+   from the Supabase SQL Editor. The script cannot identify its project from
+   SQL metadata alone. If the ledger relation is absent, do not query it
+   directly and do not run the migration runner yet.
 2. Compare ledger `created_at` values with the diagnostic's journal mapping and
    `hash` values with local migration files. The following computes hashes
    using the same UTF-8 migration text as Drizzle:
@@ -130,7 +178,7 @@ the initial schema already used that timezone.
    unexpected, or the schema is only partially migrated, **stop**. Have the
    database owner reconcile the ledger/schema before invoking any runner; do
    not replay `0000`, use `drizzle-kit push`, or manually rerun a migration.
-4. Confirm which of `0001`, `0002`, and `0003` are safely pending using both
+4. Confirm which of `0001` through `0005` are safely pending using both
    the ledger and schema/function diagnostics. This guards against partial or
    manually applied SQL that the ledger alone cannot detect.
 5. Only after that review and explicit change approval, set
@@ -153,11 +201,16 @@ the initial schema already used that timezone.
    The runner applies entries absent from its ledger in journal order. Never
    run this command while `0000` is unrecorded or when the ledger/schema differ
    unexpectedly. Do not print the connection URL or include it in shell logs.
+
 6. Rerun the read-only diagnostic. Confirm both professionals match their
    expected configured values, the two order snapshot columns exist, the RPC
    returns zero slots at offsets -1, 0 and 8 and the configured schedule for
    offsets 1 through 7, the unique active-booking index is present, and the
    expected admin-only RLS policies and grants are installed.
+
+   If applying `0005`, also confirm `public.admin_set_slot_block(date, text,
+   boolean)` exists, is executable by `service_role` only, and the reservation
+   and administrative blocking paths use the same advisory transaction lock.
 
 Migration `0001` only pins the timezone and replaces availability logic;
 `0002` adds nullable order snapshots, preserving existing orders; `0003`

@@ -50,6 +50,28 @@ export const DEFAULT_SCHEDULE: Record<string, string[]> = {
   "0": [],
 };
 
+export function parseSchedule(value: unknown): Record<string, string[]> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+
+  const schedule: Record<string, string[]> = {};
+  for (const [day, times] of Object.entries(value)) {
+    if (
+      !/^[0-6]$/.test(day) ||
+      !Array.isArray(times) ||
+      !times.every(
+        (time): time is string =>
+          typeof time === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time),
+      )
+    ) {
+      return null;
+    }
+    schedule[day] = times;
+  }
+
+  if (Object.keys(schedule).length !== 7) return null;
+  return schedule;
+}
+
 export function onlyDigits(s: string) {
   return s.replace(/\D/g, "");
 }
@@ -77,8 +99,8 @@ export type OrderSummary = {
 };
 
 export function buildWhatsAppMessage(o: OrderSummary) {
-  const subtotal =
-    o.items.reduce((sum, item) => sum + Number(item.subtotal), 0) + Number(o.pickup_fee || 0);
+  const subtotal = o.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+  const pickupFee = Number(o.pickup_fee || 0);
   const lines: string[] = [];
 
   lines.push("NOVO PEDIDO — MOTO CAR");
@@ -106,7 +128,8 @@ export function buildWhatsAppMessage(o: OrderSummary) {
     lines.push(`- ${i.quantity}x ${i.name} — ${brl(Number(i.unit_price))}`);
   }
 
-  lines.push(`Subtotal: ${brl(Number(subtotal))}`);
+  lines.push(`Subtotal: ${brl(subtotal)}`);
+  if (pickupFee > 0) lines.push(`Taxa de retirada: ${brl(pickupFee)}`);
   lines.push(`TOTAL DO PEDIDO: ${brl(Number(o.total))}`);
   lines.push("", `Observações: ${o.notes?.trim() || "nenhuma"}`);
   lines.push("", "Pedido gerado pelo site da Moto Car.");

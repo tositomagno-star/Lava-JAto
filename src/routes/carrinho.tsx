@@ -25,7 +25,12 @@ function CartPage() {
         <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground" />
         <h1 className="mt-4 text-3xl">Carrinho vazio</h1>
         <p className="mt-2 text-muted-foreground">Escolha os serviços para o seu veículo.</p>
-        <Link to="/servicos" className="mt-6 inline-block rounded-md bg-primary px-6 py-3 font-bold uppercase text-primary-foreground">Ver serviços</Link>
+        <Link
+          to="/servicos"
+          className="mt-6 inline-block rounded-md bg-primary px-6 py-3 font-bold uppercase text-primary-foreground"
+        >
+          Ver serviços
+        </Link>
       </div>
     );
   return (
@@ -39,12 +44,30 @@ function CartPage() {
               <p className="text-sm text-muted-foreground">{brl(i.price)} cada</p>
             </div>
             <div className="flex items-center rounded-md border">
-              <button aria-label="Diminuir" className="p-2 hover:text-primary" onClick={() => setQty(i.service_id, i.quantity - 1)}><Minus className="h-4 w-4" /></button>
+              <button
+                aria-label="Diminuir"
+                className="p-2 hover:text-primary"
+                onClick={() => setQty(i.service_id, i.quantity - 1)}
+              >
+                <Minus className="h-4 w-4" />
+              </button>
               <span className="w-8 text-center font-bold">{i.quantity}</span>
-              <button aria-label="Aumentar" className="p-2 hover:text-primary" onClick={() => setQty(i.service_id, i.quantity + 1)}><Plus className="h-4 w-4" /></button>
+              <button
+                aria-label="Aumentar"
+                className="p-2 hover:text-primary"
+                onClick={() => setQty(i.service_id, i.quantity + 1)}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
             <p className="w-24 text-right font-bold">{brl(i.price * i.quantity)}</p>
-            <button aria-label="Remover" className="p-2 text-muted-foreground hover:text-destructive" onClick={() => remove(i.service_id)}><Trash2 className="h-4 w-4" /></button>
+            <button
+              aria-label="Remover"
+              className="p-2 text-muted-foreground hover:text-destructive"
+              onClick={() => remove(i.service_id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </li>
         ))}
       </ul>
@@ -53,8 +76,18 @@ function CartPage() {
         <span className="font-display text-3xl text-primary">{brl(total)}</span>
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-        <Link to="/servicos" className="rounded-md border px-6 py-3 text-center font-bold uppercase hover:border-primary">Continuar escolhendo</Link>
-        <Link to="/checkout" className="rounded-md bg-primary px-8 py-3 text-center font-bold uppercase text-primary-foreground shadow-glow">Finalizar pedido</Link>
+        <Link
+          to="/servicos"
+          className="rounded-md border px-6 py-3 text-center font-bold uppercase hover:border-primary"
+        >
+          Continuar escolhendo
+        </Link>
+        <Link
+          to="/checkout"
+          className="rounded-md bg-primary px-8 py-3 text-center font-bold uppercase text-primary-foreground shadow-glow"
+        >
+          Finalizar pedido
+        </Link>
       </div>
     </div>
   );

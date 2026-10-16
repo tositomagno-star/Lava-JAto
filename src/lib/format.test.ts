@@ -4,6 +4,7 @@ import {
   brl,
   DEFAULT_SCHEDULE,
   fmtDate,
+  parseSchedule,
   todaySP,
   TZ,
   weekday,
@@ -58,5 +59,13 @@ describe("Brazil regional formatting", () => {
         .flat()
         .every((time) => /^\d{2}:\d{2}$/.test(time)),
     ).toBe(true);
+  });
+
+  it("accepts a complete schedule from settings and rejects incomplete or malformed data", () => {
+    expect(parseSchedule(DEFAULT_SCHEDULE)).toEqual(DEFAULT_SCHEDULE);
+    expect(parseSchedule({ "1": ["08:00"] })).toBeNull();
+    expect(parseSchedule({ ...DEFAULT_SCHEDULE, "2": ["not-a-time"] })).toBeNull();
+    expect(parseSchedule({ ...DEFAULT_SCHEDULE, "2": ["25:00"] })).toBeNull();
+    expect(parseSchedule(null)).toBeNull();
   });
 });

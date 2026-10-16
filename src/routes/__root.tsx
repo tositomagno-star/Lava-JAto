@@ -23,7 +23,10 @@ function NotFoundComponent() {
         <h1 className="text-7xl text-primary">404</h1>
         <h2 className="mt-4 text-xl">Página não encontrada</h2>
         <div className="mt-6">
-          <Link to="/" className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+          <Link
+            to="/"
+            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
             Voltar ao início
           </Link>
         </div>
@@ -63,14 +66,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Moto Car — Lava-jato" },
-      { name: "description", content: "Lava-jato Moto Car: agende a lavagem do seu carro ou moto online." },
+      {
+        name: "description",
+        content: "Lava-jato Moto Car: agende a lavagem do seu carro ou moto online.",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow:wght@400;500;600;700&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,

@@ -117,6 +117,7 @@ export type Database = {
           cep: string | null;
           code: string;
           complement: string | null;
+          confirmation_token: string | null;
           created_at: string;
           customer_name: string;
           delivery_method: string;
@@ -142,6 +143,7 @@ export type Database = {
           cep?: string | null;
           code?: string;
           complement?: string | null;
+          confirmation_token?: string | null;
           created_at?: string;
           customer_name: string;
           delivery_method: string;
@@ -167,6 +169,7 @@ export type Database = {
           cep?: string | null;
           code?: string;
           complement?: string | null;
+          confirmation_token?: string | null;
           created_at?: string;
           customer_name?: string;
           delivery_method?: string;
@@ -315,9 +318,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_set_slot_block: {
+        Args: { _blocked: boolean; _date: string; _slot_time: string };
+        Returns: string;
+      };
       create_order: { Args: { payload: Json }; Returns: Json };
       create_order_with_professional: {
-        Args: { _payload: Json; _professional_name: string; _professional_phone: string };
+        Args: {
+          _payload: Json;
+          _professional_name: string;
+          _professional_phone: string;
+          _confirmation_token: string;
+        };
         Returns: Json;
       };
       get_availability: {
@@ -327,7 +339,10 @@ export type Database = {
           state: string;
         }[];
       };
-      get_order_summary: { Args: { _id: string }; Returns: Json };
+      get_order_summary: {
+        Args: { _id: string; _confirmation_token: string };
+        Returns: Json;
+      };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];

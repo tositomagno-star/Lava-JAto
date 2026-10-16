@@ -29,6 +29,20 @@
       "when": 1792114447216,
       "tag": "0003_booking_window_and_professionals",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792151123401,
+      "tag": "0004_checkout_confirmation_token",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792166085760,
+      "tag": "0005_atomic_admin_slot_blocks",
+      "breakpoints": true
     }
   ]
 }
